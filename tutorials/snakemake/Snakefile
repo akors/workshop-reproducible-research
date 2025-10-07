@@ -1,0 +1,36 @@
+
+rule all:
+    input:
+        "concat_a-b.txt"
+
+rule convert_to_upper_case:
+    output:
+        "{some_name}.upper.txt"
+    input: 
+        "{some_name}.txt"
+    shell:
+        """
+        tr [a-z] [A-Z] < {input} > {output}
+        """
+
+import os
+
+def concat_input(wildcards):
+    #files = [wildcards.first + ".upper.txt", wildcards.second + ".upper.txt"]
+    
+
+    files = [wc + ".upper.txt" for wc in wildcards.samples.split("-")]
+    return files
+
+
+
+
+rule concatenate_a_and_b:
+    input:
+        concat_input
+    output:
+        "concat_{samples}.txt"
+    shell:
+        """
+        cat {input} > {output}
+        """
