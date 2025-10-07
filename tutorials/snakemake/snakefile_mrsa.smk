@@ -1,6 +1,18 @@
 from snakemake.utils import min_version
 min_version("8.0.0")
 
+# define an empty 'samples' dictionary
+samples = {}
+# read the sample list file and populate the dictionary
+with open(config["sample_list"], "r") as fhin:
+    for line in fhin:
+        # strip the newline character from the end of the line
+        # then split by tab character to get the sample id and url
+        sample_id, url = line.strip().split(",")
+        # store the url in the dictionary with the sample id as key
+        samples[sample_id] = url
+
+
 rule all:
     """
     Collect the main outputs of the workflow.
@@ -10,9 +22,7 @@ rule all:
         "results/multiqc/NCTC8325.multiqc.html"
 
 
-
 def get_sample_url(wildcards):
-    samples = config["samples"]
     return samples[wildcards.sample_id]
 
 
@@ -58,7 +68,7 @@ rule multiqc:
         html = "results/multiqc/{genome_id}.multiqc.html",
         stats = "results/multiqc/{genome_id}.multiqc_general_stats.txt"
     input:
-        bams = expand("results/fastqc/{sample_id}_fastqc.zip", sample_id = config["samples"].keys())
+        bams = expand("results/fastqc/{sample_id}_fastqc.zip", sample_id = samples.keys())
     log:
         "results/logs/multiqc/{genome_id}.log"
     shell:
@@ -139,6 +149,7 @@ rule align_to_genome:
     """
     Align a fastq file to a genome index using Bowtie 2.
     """
+    container: "docker://quay.io/biocontainers/bowtie2:2.5.0--py310h8d7afc0_0"
     output:
         temp("results/bam/{sample_id,\\w+}.bam")
     input:
@@ -171,7 +182,7 @@ rule generate_count_table:
     output:
         "results/tables/{genome_id}.counts.tsv"
     input:
-        bams = expand("results/bam/{sample_id}.sorted.bam", sample_id = config["samples"].keys()),
+        bams = expand("results/bam/{sample_id}.sorted.bam", sample_id = samples.keys()),
         annotation = "data/ref/{genome_id}.gff3.gz"
     log:
         "results/logs/generate_count_table/{genome_id}.log"
