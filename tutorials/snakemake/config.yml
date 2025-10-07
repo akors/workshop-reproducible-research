@@ -1,4 +1,5 @@
 max_reads: 25000
+genome_id: NCTC8325
 sample_list: "samples.csv"
 genomes:
   NCTC8325:

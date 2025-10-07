@@ -18,8 +18,8 @@ rule all:
     Collect the main outputs of the workflow.
     """
     input:
-        "results/tables/NCTC8325.counts.tsv",
-        "results/multiqc/NCTC8325.multiqc.html"
+        "results/tables/counts.tsv",
+        "results/multiqc/multiqc.html"
 
 
 def get_sample_url(wildcards):
@@ -65,12 +65,12 @@ rule multiqc:
     Aggregate all FastQC reports into a MultiQC report.
     """
     output:
-        html = "results/multiqc/{genome_id}.multiqc.html",
-        stats = "results/multiqc/{genome_id}.multiqc_general_stats.txt"
+        html = "results/multiqc/multiqc.html",
+        stats = "results/multiqc/multiqc_general_stats.txt"
     input:
         bams = expand("results/fastqc/{sample_id}_fastqc.zip", sample_id = samples.keys())
     log:
-        "results/logs/multiqc/{genome_id}.log"
+        "results/logs/multiqc/log"
     shell:
         """
         # Run multiQC and keep the html report
@@ -129,7 +129,7 @@ rule index_genome:
     """
     shadow: "minimal"
     output:        
-        expand("results/bowtie2/{{genome_id}}.{substr}.bt2", 
+        expand("results/bowtie2/{{genome_id}}.{substr}.bt2",
             substr = ["1", "2", "3", "4", "rev.1", "rev.2"])
     input:
         "data/ref/{genome_id}.fa.gz"
@@ -139,10 +139,7 @@ rule index_genome:
         """
         # Bowtie2 cannot use .gz, so unzip to a temporary file first
         gunzip -c {input} > tempfile
-        bowtie2-build tempfile results/bowtie2/{genome_id} >{log}
-
-        # Remove the temporary file
-        rm tempfile
+        bowtie2-build tempfile results/bowtie2/{wildcards.genome_id} >{log}
         """
 
 rule align_to_genome:
@@ -154,11 +151,12 @@ rule align_to_genome:
         temp("results/bam/{sample_id,\\w+}.bam")
     input:
         "data/{sample_id}.fastq.gz",
-        expand("results/bowtie2/{{genome_id}}.{substr}.bt2", 
+        expand("results/bowtie2/{genome_id}.{substr}.bt2",
+           genome_id = config["genome_id"],
             substr = ["1", "2", "3", "4", "rev.1", "rev.2"])
     shell:
         """
-        bowtie2 -x results/bowtie2/{genome_id} -U {input[0]} > {output}
+        bowtie2 -x results/bowtie2/{config[genome_id]} -U {input[0]} > {output}
         """
 
 
@@ -180,13 +178,14 @@ rule generate_count_table:
     Generate a count table using featureCounts.
     """
     output:
-        "results/tables/{genome_id}.counts.tsv"
+        "results/tables/counts.tsv",
+        "results/tables/counts.tsv.summary"
     input:
         bams = expand("results/bam/{sample_id}.sorted.bam", sample_id = samples.keys()),
-        annotation = "data/ref/{genome_id}.gff3.gz"
+        annotation = expand("data/ref/{genome_id}.gff3.gz", genome_id=config["genome_id"])
     log:
-        "results/logs/generate_count_table/{genome_id}.log"
+        "results/logs/generate_count_table.log"
     shell:
         """
-        featureCounts -t gene -g gene_id -a {input.annotation} -o {output} {input.bams} 2>{log}
+        featureCounts -t gene -g gene_id -a {input.annotation} -o {output[0]} {input.bams} 2>{log}
         """
